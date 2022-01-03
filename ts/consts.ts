@@ -1,0 +1,10 @@
+export const nomad_id = '320737111500128256'
+export const members_key = "members"
+export const role_key = "roles"
+export const exclude_role_key = "exclude-roles"
+export const role_map = "roles-map"
+export const greet_chat_key = "greet-key"
+export const server_owner_key = "owner"
+export const react_setup_msg = "react-msg"
+export const test_server_id = '924655749538402304'
+export const greets = "greeting-record"

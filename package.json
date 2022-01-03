@@ -1,0 +1,17 @@
+{
+  "name": "skys-discord-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./.out/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "tsc": "tsc",
+    "deploy": "tsc && Copy.bat > nul && node .",
+    "deploy-d": "tsc && node ./js/index.js"
+  },
+  "author": "Dan S",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^13.4.0"
+  }
+}

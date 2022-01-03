@@ -1,0 +1,9 @@
+.out/
+.vscode/
+node_modules/
+
+/**/token.json
+*.bat
+*.log
+*.txt
+guild_records.json
