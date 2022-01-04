@@ -45,25 +45,24 @@ class InputPipe {
             if (this.AtEndOfPipe()) {
                 return;
             }
-            if (this.m_cur_func >= this.m_pipe.length) {
+            const incorrect_setup = this.m_cur_func >= this.m_pipe.length;
+            const bad_arg_for_first_func = this.m_cur_func === 0 && input instanceof discord_js_1.Message;
+            const bad_arg_for_rest_funcs = this.m_cur_func > 0 && input instanceof discord_js_1.Guild;
+            if (incorrect_setup) {
                 throw new Error("Input Pipe was not set up correctly");
             }
-            else if (this.m_cur_func === 0 && input instanceof discord_js_1.Message) {
+            else if (bad_arg_for_first_func || bad_arg_for_rest_funcs) {
                 return;
             }
-            else if (this.m_cur_func > 0 && input instanceof discord_js_1.Guild) {
-                return;
-            }
-            console.log(this.m_cur_func);
-            let res;
+            let get_next_func;
             let func = this.m_pipe[this.m_cur_func];
             if (this.m_cur_func === 0) {
-                res = yield func(input, this.m_data_store);
+                get_next_func = yield func(input, this.m_data_store);
             }
             else {
-                res = yield func(input, this.m_data_store);
+                get_next_func = yield func(input, this.m_data_store);
             }
-            if (res) {
+            if (get_next_func) {
                 this.m_cur_func++;
             }
         });

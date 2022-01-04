@@ -6,7 +6,7 @@ const queue_1 = require("./queue");
 class SetUpManager {
     constructor() {
         this.m_guilds = new Map();
-        this.m_other_membs = new Map();
+        this.m_other_guild_membs = new Map();
     }
     static Get() {
         if (this.manager === null) {
@@ -21,13 +21,13 @@ class SetUpManager {
         }
         const pipe = (0, miscFuncs_1.CreatePipe)();
         queue.Enqueue(pipe);
-        if (!this.m_other_membs.has(key.guild.id)) {
-            this.m_other_membs.set(key.guild.id, queue);
+        if (!this.m_other_guild_membs.has(key.guild.id)) {
+            this.m_other_guild_membs.set(key.guild.id, queue);
         }
     }
     Delete(key) {
         this.m_guilds.delete(key.id);
-        this.m_other_membs.delete(key.guild.id);
+        this.m_other_guild_membs.delete(key.guild.id);
     }
     GetIncompletePipe(key) {
         var _a;
@@ -52,7 +52,7 @@ class SetUpManager {
     }
     ServerNotReady(server_id) {
         var _a, _b;
-        return this.m_other_membs.has(server_id) && !((_b = (_a = this.m_other_membs.get(server_id)) === null || _a === void 0 ? void 0 : _a.Front()) === null || _b === void 0 ? void 0 : _b.IsComplete());
+        return this.m_other_guild_membs.has(server_id) && !((_b = (_a = this.m_other_guild_membs.get(server_id)) === null || _a === void 0 ? void 0 : _a.Front()) === null || _b === void 0 ? void 0 : _b.IsComplete());
     }
 }
 exports.SetUpManager = SetUpManager;

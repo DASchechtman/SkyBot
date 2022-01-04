@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 const discord_js_1 = require("discord.js");
 const consts_1 = require("./consts");
@@ -31,50 +32,47 @@ const bot = new discord_js_1.Client({
         'CHANNEL',
         'MESSAGE',
         'REACTION',
-        'GUILD_MEMBER'
+        'GUILD_MEMBER',
+        'USER'
     ]
 });
+(_a = bot.user) === null || _a === void 0 ? void 0 : _a.id;
 let index = 0;
-function Greet(member) {
-    var _a;
+function GreetNewMember(member) {
     const tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(member.guild.name);
-    const greet_channel = (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greet_chat_key)) === null || _a === void 0 ? void 0 : _a.Get();
-    if (!greet_channel) {
+    const greet_channel = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greet_chat_key);
+    if (!greet_channel || greet_channel.Type() !== jsonTree_1.NodeTypes.STR_TYPE) {
         return;
     }
     if (!(tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greets))) {
         tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.greets, new Map());
     }
-    (0, miscFuncs_1.GetManagerData)(member.guild.channels, greet_channel).then((channels) => {
-        const greet_chan = channels.get(greet_channel);
-        if (greet_chan === null || greet_chan === void 0 ? void 0 : greet_chan.isText()) {
-            let greeting = `Hello <@${member.id}>, and welcome aboard. Please react to this message to assign yourself roles.\n`;
-            greeting += "Each emoji gives you a role in the order they appear in the list below:\n";
-            (0, miscFuncs_1.GetManagerData)(member.guild.roles).then(roles => {
-                var _a, _b;
-                const emoji_roles = (_a = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(member.guild.name)) === null || _a === void 0 ? void 0 : _a.GetNode(consts_1.role_map);
-                if (!emoji_roles) {
-                    console.log("couldn't get roles on greet");
-                    return;
-                }
-                const vals = emoji_roles.GetAllVals();
-                const keys = emoji_roles.GetAllKeys();
-                let index = 1;
-                for (let i of vals) {
-                    greeting += `${index}.) ${(_b = roles.get(i.Get())) === null || _b === void 0 ? void 0 : _b.name}\n`;
-                    index++;
-                }
-                greet_chan.send(greeting).then(msg => {
-                    var _a;
-                    keys.forEach((key) => {
-                        msg.react(key);
-                    });
-                    (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greets)) === null || _a === void 0 ? void 0 : _a.CreateChild(msg.id, null);
-                    disk_1.Disk.Get().Save();
-                });
-            });
+    (0, miscFuncs_1.GetManagerData)(member.guild.channels, greet_channel.Get()).then((channels) => __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c;
+        const greet_chan = channels.get(greet_channel.Get());
+        if (!(greet_chan === null || greet_chan === void 0 ? void 0 : greet_chan.isText())) {
+            return;
         }
-    });
+        let greeting = `Hello <@${member.id}>, and welcome aboard. Please react to this message to assign yourself roles.\n`;
+        greeting += "Each emoji gives you a role in the order they appear in the list below:\n";
+        const emoji_id_to_role_id_map = (_a = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(member.guild.name)) === null || _a === void 0 ? void 0 : _a.GetNode(consts_1.role_map);
+        if (!emoji_id_to_role_id_map) {
+            console.log("couldn't get roles on greet");
+            return;
+        }
+        const roles = yield (0, miscFuncs_1.GetManagerData)(member.guild.roles);
+        const vals = emoji_id_to_role_id_map.GetAllVals();
+        const keys = emoji_id_to_role_id_map.GetAllKeys();
+        let index = 1;
+        for (let i of vals) {
+            greeting += `${index}.) ${(_b = roles.get(i.Get())) === null || _b === void 0 ? void 0 : _b.name}\n`;
+            index++;
+        }
+        let msg = yield greet_chan.send(greeting);
+        keys.forEach((key) => { msg.react(key); });
+        (_c = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greets)) === null || _c === void 0 ? void 0 : _c.CreateChild(msg.id, null);
+        disk_1.Disk.Get().Save();
+    }));
 }
 function ForgetMember(member) {
     var _a;
@@ -103,7 +101,6 @@ bot.once("ready", (client) => {
     client.guilds.fetch().then(guilds => {
         guilds.forEach((club) => __awaiter(void 0, void 0, void 0, function* () {
             var _a;
-            // check each member of guild to see if there are any unrecorded members
             let tree_node = disk_1.Disk.Get().GetJsonTreeRoot();
             const saved_guild = tree_node.HasNode(club.name);
             if (!saved_guild) {
@@ -117,7 +114,7 @@ bot.once("ready", (client) => {
             members.forEach((member) => {
                 const has_member = tree_node.HasNode(member.id);
                 if (saved_guild && !has_member) {
-                    Greet(member);
+                    GreetNewMember(member);
                 }
                 if (!has_member) {
                     tree_node.CreateChild(member.id, null);
@@ -135,7 +132,6 @@ bot.once("ready", (client) => {
 const addListeners = () => {
     console.log("adding listeners");
     bot.on("guildCreate", (guild) => {
-        // start the instruction process somewhere
         let tree = disk_1.Disk.Get().GetJsonTreeRoot()
             .CreateChild(guild.name, new Map())
             .CreateChild(consts_1.members_key, new Map());
@@ -143,12 +139,18 @@ const addListeners = () => {
         (0, miscFuncs_1.GetManagerData)(guild.members, consts_1.nomad_id).then(members => {
             var _a;
             const member = members.get(consts_1.nomad_id);
+            if (!member) {
+                const err_msg = "Error: Bot owner not in the guild, not recording members";
+                console.log(err_msg);
+                disk_1.Disk.Get().GetJsonTreeRoot().DeleteChild(guild.name);
+                disk_1.Disk.Get().Save();
+                return;
+            }
             guild_input_pipes.Add(member);
             members.forEach((member) => {
                 tree === null || tree === void 0 ? void 0 : tree.CreateChild(member.id, null);
             });
             disk_1.Disk.Get().Save();
-            console.log(member);
             (_a = guild_input_pipes.GetIncompletePipe(consts_1.nomad_id)) === null || _a === void 0 ? void 0 : _a.Run(guild);
         });
     });
@@ -164,26 +166,17 @@ const addListeners = () => {
     });
     bot.on("messageCreate", (message) => {
         var _a, _b;
-        if (message.author.bot && ((_a = message.guild) === null || _a === void 0 ? void 0 : _a.id) !== consts_1.test_server_id) {
-            return;
-        }
-        else if (message.author.id === '778225437671161856') {
+        const from_bot_in_reg_server = message.author.bot && ((_a = message.guild) === null || _a === void 0 ? void 0 : _a.id) !== consts_1.test_server_id;
+        const from_bot_in_test_server = message.author.id === ((_b = bot.user) === null || _b === void 0 ? void 0 : _b.id);
+        if (from_bot_in_reg_server || from_bot_in_test_server) {
             return;
         }
         if (guild_input_pipes.Has(message.author.id)) {
             const pipe = guild_input_pipes.GetIncompletePipe(message.author.id);
-            console.log("running pipe");
-            if (pipe) {
-                //pipe?.Run(message)
-                return;
-            }
+            pipe === null || pipe === void 0 ? void 0 : pipe.Run(message);
+            return;
         }
         else if (!message.guild || guildSetUpManager_1.SetUpManager.Get().ServerNotReady(message.guild.id)) {
-            let guild_name = (_b = message.guild) === null || _b === void 0 ? void 0 : _b.name;
-            if (message.guild === undefined) {
-                guild_name = "undefined";
-            }
-            console.log(`server not ready ${index}`, guild_name);
             index++;
             return;
         }
@@ -203,88 +196,87 @@ const addListeners = () => {
             console.log("Error: no guild attact to message reaction");
             return;
         }
-        const tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(reaction.message.guild.name);
-        const saved_roles = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.role_key);
-        const emoji_to_role = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.role_map);
-        const react_msg = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.react_setup_msg);
+        const json_guild_root = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(reaction.message.guild.name);
         const input_pipe = guild_input_pipes.GetIncompletePipe(consts_1.nomad_id);
+        const emoji_id_to_role_id_map = json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.role_map);
         if (input_pipe && !input_pipe.IsComplete()) {
-            if (!tree || !saved_roles || !emoji_to_role || !react_msg) {
+            const roles_list = json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.role_key);
+            const react_msg_id = json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.react_setup_msg);
+            if (!json_guild_root
+                || !roles_list
+                || !emoji_id_to_role_id_map
+                || !react_msg_id) {
                 console.log("Error: required data not present for reaction");
                 return;
             }
-            const message_id = react_msg.Get();
+            const message_id = react_msg_id.Get();
             if (reaction.message.id !== message_id) {
                 console.log("Error: not correct msg for init react setup");
                 return;
             }
-            (0, miscFuncs_1.GetManagerData)(reaction.users, consts_1.nomad_id).then(users => {
-                var _a, _b, _c, _d, _e;
-                const first_user_id = (_a = users.at(0)) === null || _a === void 0 ? void 0 : _a.id;
-                if (first_user_id !== consts_1.nomad_id) {
-                    reaction.remove();
-                    console.log("Error: not the right person to create reactions");
-                    return;
-                }
-                if (saved_roles.Type() !== jsonTree_1.NodeTypes.ARRAY_TYPE) {
-                    console.log("Error: roles not found");
-                    return;
-                }
-                if (saved_roles && saved_roles.ArraySize() > 0) {
-                    const role_id = (_c = (_b = tree.GetNode(consts_1.role_key)) === null || _b === void 0 ? void 0 : _b.GetAt(0)) === null || _c === void 0 ? void 0 : _c.Get();
-                    if (role_id === undefined) {
+            const MapEmojiIdToRoleId = function (react_user) {
+                var _a, _b, _c;
+                return __awaiter(this, void 0, void 0, function* () {
+                    const first_user_id = react_user.id;
+                    if (first_user_id !== consts_1.nomad_id) {
+                        reaction.remove();
+                        console.log("Error: not the right person to create reactions");
                         return;
                     }
-                    emoji_to_role.CreateChild(reaction.emoji.identifier, role_id);
-                    (_d = tree.GetNode(consts_1.role_key)) === null || _d === void 0 ? void 0 : _d.RemoveAt(0);
-                }
-                if (tree.GetNode(consts_1.role_key) && !((_e = tree.GetNode(consts_1.role_key)) === null || _e === void 0 ? void 0 : _e.GetAt(0))) {
-                    input_pipe.MakeComplete();
-                    (0, miscFuncs_1.GetManagerData)(reaction.message.guild.members, consts_1.nomad_id).then(members => {
-                        const member = members.get(consts_1.nomad_id);
-                        if (member) {
-                            guildSetUpManager_1.SetUpManager.Get().Delete(member);
+                    if (roles_list.Type() !== jsonTree_1.NodeTypes.ARRAY_TYPE) {
+                        console.log("Error: roles not found");
+                        return;
+                    }
+                    const HasItems = () => { return roles_list.ArraySize() > 0; };
+                    if (HasItems()) {
+                        const role_id = (_b = (_a = json_guild_root.GetNode(consts_1.role_key)) === null || _a === void 0 ? void 0 : _a.GetAt(0)) === null || _b === void 0 ? void 0 : _b.Get();
+                        if (role_id === undefined) {
+                            return;
                         }
-                        member === null || member === void 0 ? void 0 : member.send("Thank you. Setup all done");
-                    });
-                }
-                disk_1.Disk.Get().Save();
-            });
+                        emoji_id_to_role_id_map.CreateChild(reaction.emoji.identifier, role_id);
+                        (_c = json_guild_root.GetNode(consts_1.role_key)) === null || _c === void 0 ? void 0 : _c.RemoveAt(0);
+                    }
+                    if (!HasItems()) {
+                        const members = yield reaction.message.guild.members.fetch();
+                        input_pipe.MakeComplete();
+                        if (members && members.get(consts_1.nomad_id)) {
+                            const member = members.get(consts_1.nomad_id);
+                            guildSetUpManager_1.SetUpManager.Get().Delete(member);
+                            member.send("Thank you. Setup all done");
+                        }
+                    }
+                    disk_1.Disk.Get().Save();
+                });
+            };
+            MapEmojiIdToRoleId(user);
             return;
         }
-        reaction.message.guild.fetch().then(guild => {
-            (0, miscFuncs_1.GetManagerData)(reaction.users).then(users => {
-                var _a;
-                if (!emoji_to_role) {
-                    console.log("cant load emoji for reaction");
-                    return;
-                }
-                const last_user = user;
-                const guild_member = guild.members.cache.get(last_user.id);
-                const role_id = emoji_to_role.GetNode(reaction.emoji.identifier);
-                if (!role_id) {
-                    console.log("cant add role");
-                    return;
-                }
-                if (!guild_member) {
-                    console.log("member doesnt exist");
-                    return;
-                }
-                if (!last_user) {
-                    console.log("user doenst exist");
-                    return;
-                }
-                if (!(tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greets))) {
-                    console.log("Error: not prior greet msgs");
-                    return;
-                }
-                if (!((_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greets)) === null || _a === void 0 ? void 0 : _a.GetNode(reaction.message.id))) {
-                    console.log("Error: not a greet msg");
-                    return;
-                }
-                guild_member === null || guild_member === void 0 ? void 0 : guild_member.roles.add(role_id.Get());
-            });
-        }).catch(() => { console.log("reaction error"); });
+        (0, miscFuncs_1.GetManagerData)(reaction.message.guild.members).then(members => {
+            var _a;
+            const guild_member = members.get(user.id);
+            const role_id = emoji_id_to_role_id_map === null || emoji_id_to_role_id_map === void 0 ? void 0 : emoji_id_to_role_id_map.GetNode(reaction.emoji.identifier);
+            if (!role_id) {
+                console.log("cant add role");
+                return;
+            }
+            else if (role_id.Type() !== jsonTree_1.NodeTypes.STR_TYPE) {
+                console.log("incorrect type for reaction");
+                return;
+            }
+            else if (!guild_member) {
+                console.log("member doesnt exist");
+                return;
+            }
+            else if (!(json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.greets))) {
+                console.log("Error: not prior greet msgs");
+                return;
+            }
+            else if (!((_a = json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.greets)) === null || _a === void 0 ? void 0 : _a.GetNode(reaction.message.id))) {
+                console.log("Error: not a greet msg");
+                return;
+            }
+            guild_member === null || guild_member === void 0 ? void 0 : guild_member.roles.add(role_id.Get());
+        });
     });
     bot.on("messageReactionRemove", (reaction, user) => {
         if (!reaction.message.guild) {
@@ -323,7 +315,7 @@ const addListeners = () => {
         console.log(member.guild.name);
         let tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(member.guild.name).GetNode(consts_1.members_key);
         tree === null || tree === void 0 ? void 0 : tree.CreateChild(member.id, null);
-        Greet(member);
+        GreetNewMember(member);
         disk_1.Disk.Get().Save();
     });
     bot.on("guildMemberRemove", member => {

@@ -277,7 +277,7 @@ export class JsonTreeNode {
                 str_representation = '{'
                 let i = 0;
                 (this.m_data as JsonMap).forEach((val, key, map) => {
-                    str_representation += `${key}:${val}`
+                    str_representation += `"${key}":${val}`
                     if (i !== map.size - 1) {
                         str_representation += ','
                     }

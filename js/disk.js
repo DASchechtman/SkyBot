@@ -12,7 +12,7 @@ class Disk {
         this.m_tree_root = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ROOT_TYPE);
         this.m_file_path = path_1.default.resolve(__dirname, '../guild_records.json');
         const tree = JSON.parse(fs_1.default.readFileSync(this.m_file_path, 'utf-8'));
-        this.ReadTree(tree, this.m_tree_root);
+        this.CreateTree(tree, this.m_tree_root);
         console.log("done building tree");
     }
     static Get() {
@@ -25,49 +25,53 @@ class Disk {
         const ret_array = new Array();
         val.forEach((item) => {
             let node;
-            if (item instanceof Array) {
-                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ARRAY_TYPE);
-                node.Set(this.CreateArray(item));
-                ret_array.push(node);
-            }
-            else if (typeof item === 'number') {
-                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NUM_TYPE);
-                node.Set(val);
-                ret_array.push(node);
+            let type = jsonTree_1.NodeTypes.NULL_TYPE;
+            if (typeof item === 'number') {
+                type = jsonTree_1.NodeTypes.NUM_TYPE;
             }
             else if (typeof item === 'string') {
-                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.STR_TYPE);
-                node.Set(val);
-                ret_array.push(node);
+                type = jsonTree_1.NodeTypes.STR_TYPE;
             }
             else if (typeof item === 'boolean') {
-                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.BOOL_TYPE);
-                node.Set(val);
-                ret_array.push(node);
+                type = jsonTree_1.NodeTypes.BOOL_TYPE;
             }
             else if (item === null) {
-                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
-                node.Set(null);
-                ret_array.push(node);
+                type = jsonTree_1.NodeTypes.NULL_TYPE;
+            }
+            else if (item instanceof Array) {
+                type = jsonTree_1.NodeTypes.ARRAY_TYPE;
             }
             else {
-                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ROOT_TYPE);
-                this.ReadTree(item, node);
-                ret_array.push(node);
+                type = jsonTree_1.NodeTypes.ROOT_TYPE;
+            }
+            switch (type) {
+                case jsonTree_1.NodeTypes.ARRAY_TYPE: {
+                    node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ARRAY_TYPE);
+                    node.Set(this.CreateArray(item));
+                    ret_array.push(node);
+                    break;
+                }
+                case jsonTree_1.NodeTypes.ROOT_TYPE: {
+                    node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ROOT_TYPE);
+                    this.CreateTree(item, node);
+                    ret_array.push(node);
+                    break;
+                }
+                default: {
+                    node = new jsonTree_1.JsonTreeNode(type);
+                    node.Set(item);
+                    ret_array.push(node);
+                }
             }
         });
         return ret_array;
     }
-    ReadTree(tree, json_tree) {
-        for (let obj of Object.entries(tree)) {
+    CreateTree(tree_root, json_tree_root) {
+        for (let obj of Object.entries(tree_root)) {
             const key = obj[0];
             const val = obj[1];
             let node;
-            if (val instanceof Array) {
-                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ARRAY_TYPE);
-                node.Set(this.CreateArray(val));
-            }
-            else if (typeof val === 'number') {
+            if (typeof val === 'number') {
                 node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NUM_TYPE);
                 node.Set(val);
             }
@@ -83,11 +87,15 @@ class Disk {
                 node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
                 node.Set(null);
             }
+            else if (val instanceof Array) {
+                node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ARRAY_TYPE);
+                node.Set(this.CreateArray(val));
+            }
             else {
                 node = new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.ROOT_TYPE);
-                this.ReadTree(val, node);
+                this.CreateTree(val, node);
             }
-            json_tree.AddChild(key, node);
+            json_tree_root.AddChild(key, node);
         }
     }
     Save() {

@@ -15,32 +15,6 @@ const consts_1 = require("./consts");
 const disk_1 = require("./disk");
 const jsonTree_1 = require("./jsonTree");
 const inputPipe_1 = require("./inputPipe");
-function CreateListMessage(func, omit_res, id_func, array, init_msg) {
-    let ret_message = init_msg;
-    let indexes = [];
-    let index = 1;
-    for (let i of array) {
-        if (omit_res(i[1])) {
-            continue;
-        }
-        ret_message += `${index}.) ${func(i[1])}\n`;
-        indexes.push({
-            i: index - 1,
-            id: id_func(i[1])
-        });
-        index++;
-    }
-    return [ret_message, indexes];
-}
-function AskRolesToRemove(guild) {
-    var _a;
-    return __awaiter(this, void 0, void 0, function* () {
-        const roles = yield GetManagerData(guild.roles);
-        let res = CreateListMessage((item) => { return item.name; }, (item) => { return item.managed || `${item}` === "@everyone"; }, (item) => { return item.id; }, roles, "Please pick the roles you wish to exclude.\n");
-        yield ((_a = (yield GetManagerData(guild.members, consts_1.nomad_id)).get(consts_1.nomad_id)) === null || _a === void 0 ? void 0 : _a.send(res[0]));
-        return res[1];
-    });
-}
 function SendInitReactionMsg(guild) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
@@ -100,82 +74,107 @@ function RequestGreetChatAndUserId(guild, queue) {
         return true;
     });
 }
-function GetServerRolesAndAskForExcluded(message, queue) {
-    var _a, _b, _c;
+function GetServerRoles(message, queue) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        if (queue.Size() === 0) {
+            return new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
+        }
+        const group = yield GetManagerData(message.author.client.guilds);
+        const guild_name = queue.Front();
+        let server = undefined;
+        if (group.at(0) instanceof discord_js_1.Guild) {
+            server = group.get(guild_name);
+        }
+        else {
+            server = yield ((_a = group.get(guild_name)) === null || _a === void 0 ? void 0 : _a.fetch());
+        }
+        if (!server) {
+            return new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
+        }
+        const roles = yield GetManagerData(server.roles);
+        const roles_list = (_b = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name)) === null || _b === void 0 ? void 0 : _b.GetNode(consts_1.role_key);
+        for (let role of roles) {
+            if (role[1].managed || role[1].toString() === '@everyone') {
+                continue;
+            }
+            roles_list === null || roles_list === void 0 ? void 0 : roles_list.PushTo(role[1].id);
+            roles_list === null || roles_list === void 0 ? void 0 : roles_list.PushTo(role[1].name);
+        }
+        return roles_list ? roles_list : new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
+    });
+}
+function AskForRolesToNotOffer(node, message) {
+    var _a;
+    if (node.Type() !== jsonTree_1.NodeTypes.ARRAY_TYPE) {
+        return false;
+    }
+    let instructions = "Please pick the roles you wish to exclude.\n";
+    let index = 1;
+    for (let i = 0; i < node.ArraySize(); i += 2) {
+        const name_index = i + 1;
+        instructions += `${index}.) ${(_a = node.GetAt(name_index)) === null || _a === void 0 ? void 0 : _a.Get()}\n`;
+        node.SetAt(name_index, null);
+        index++;
+    }
+    node.Filter(item => item.Type() !== jsonTree_1.NodeTypes.NULL_TYPE);
+    message.channel.send(instructions);
+    return true;
+}
+function GetServerRolesAndAskForRolesToNotOffer(message, queue) {
     return __awaiter(this, void 0, void 0, function* () {
         if (message.author.id !== consts_1.nomad_id) {
             return false;
         }
-        const args = message.content.split(' ');
-        const guild_name = queue.Front();
-        let guild = yield GetManagerData(message.author.client.guilds);
-        const was_cached = guild.at(0) instanceof discord_js_1.Guild;
-        const json_node = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name);
-        (_a = json_node === null || json_node === void 0 ? void 0 : json_node.GetNode(consts_1.greet_chat_key)) === null || _a === void 0 ? void 0 : _a.Set(args[0]);
-        (_b = json_node === null || json_node === void 0 ? void 0 : json_node.GetNode(consts_1.server_owner_key)) === null || _b === void 0 ? void 0 : _b.Set(args[1]);
+        const roles_list = yield GetServerRoles(message, queue);
+        const ret = AskForRolesToNotOffer(roles_list, message);
         disk_1.Disk.Get().Save();
-        const RecordRoles = (guild) => __awaiter(this, void 0, void 0, function* () {
-            var _d;
-            for (let entry of yield AskRolesToRemove(guild)) {
-                (_d = json_node === null || json_node === void 0 ? void 0 : json_node.GetNode(consts_1.role_key)) === null || _d === void 0 ? void 0 : _d.SetAt(entry.i, entry.id);
-            }
-        });
-        if (was_cached) {
-            guild = guild;
-            const server = guild.find(s => s.name === guild_name);
-            if (server) {
-                RecordRoles(server);
-            }
-            return Boolean(server);
-        }
-        guild = guild;
-        const server = yield ((_c = guild.find(s => s.name === guild_name)) === null || _c === void 0 ? void 0 : _c.fetch());
-        if (server) {
-            RecordRoles(server);
-        }
-        return Boolean(server);
+        return ret;
     });
 }
-function ExcludeRolesAndAskForReactsOnMsg(message, queue) {
-    var _a, _b, _c;
+function ExcludeRoles(message, guild_name) {
+    const json_guild_root = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name);
+    const roles_list = json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.role_key);
+    const role_indexes = message.content.split(' ');
+    for (let str_index of role_indexes) {
+        const num = Number.parseInt(str_index);
+        if (Number.isNaN(num)) {
+            continue;
+        }
+        roles_list === null || roles_list === void 0 ? void 0 : roles_list.SetAt(num - 1, null);
+    }
+    roles_list === null || roles_list === void 0 ? void 0 : roles_list.Filter(item => item.Type() != jsonTree_1.NodeTypes.NULL_TYPE);
+}
+function AskForReactionOnMsg(message, guild_name) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
-        const guild_name = queue.Front();
-        const tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name);
-        let rk = consts_1.role_key;
-        let roles = tree === null || tree === void 0 ? void 0 : tree.GetNode(rk);
-        if (!roles) {
-            return false;
-        }
-        console.log("sending react msg");
-        const indexes = message.content.split(' ');
-        for (let str of indexes) {
-            let num = Number.parseInt(str);
-            if (Number.isNaN(num)) {
-                continue;
-            }
-            (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.role_key)) === null || _a === void 0 ? void 0 : _a.SetAt(num - 1, null);
-        }
-        (_b = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.role_key)) === null || _b === void 0 ? void 0 : _b.Filter(item => item.Type() !== jsonTree_1.NodeTypes.NULL_TYPE);
-        disk_1.Disk.Get().Save();
         const members = yield GetManagerData(message.author.client.guilds, g => g.name === guild_name);
         if (members.at(0) instanceof discord_js_1.Guild) {
             const server = members.find(s => s.name === guild_name);
             if (server) {
                 SendInitReactionMsg(server);
-                return Boolean(server);
             }
+            return Boolean(server);
         }
-        const server = yield ((_c = members.find(s => s.name === guild_name)) === null || _c === void 0 ? void 0 : _c.fetch());
+        const server = yield ((_a = members.find(s => s.name === guild_name)) === null || _a === void 0 ? void 0 : _a.fetch());
         if (server) {
             SendInitReactionMsg(server);
         }
-        return Boolean(server);
+    });
+}
+function ExcludeRolesAndAskForReactsOnMsg(message, queue) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const guild_name = queue.Front();
+        ExcludeRoles(message, guild_name);
+        AskForReactionOnMsg(message, guild_name);
+        disk_1.Disk.Get().Save();
+        return true;
     });
 }
 function CreatePipe() {
     const pipe = new inputPipe_1.InputPipe();
     pipe.MakeStartOfPipe(RequestGreetChatAndUserId);
-    pipe.AddToPipe(GetServerRolesAndAskForExcluded);
+    pipe.AddToPipe(GetServerRolesAndAskForRolesToNotOffer);
     pipe.AddToPipe(ExcludeRolesAndAskForReactsOnMsg);
     return pipe;
 }
