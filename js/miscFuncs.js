@@ -24,8 +24,9 @@ function SendInitReactionMsg(guild) {
         if (typeof greet_id !== 'string') {
             return false;
         }
-        const channel = channels.get(greet_id);
+        const channel = channels.find(c => c.id === greet_id);
         if (!(channel === null || channel === void 0 ? void 0 : channel.isText())) {
+            console.log(`Error: channel doesn't exist in ${guild.name}`);
             return false;
         }
         const roles = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.role_key);
@@ -84,23 +85,23 @@ function GetServerRoles(message, queue) {
         const guild_name = queue.Front();
         let server = undefined;
         if (group.at(0) instanceof discord_js_1.Guild) {
-            server = group.get(guild_name);
+            server = group.find(s => s.name === guild_name);
         }
         else {
-            server = yield ((_a = group.get(guild_name)) === null || _a === void 0 ? void 0 : _a.fetch());
+            server = yield ((_a = group.find(s => s.name === guild_name)) === null || _a === void 0 ? void 0 : _a.fetch());
         }
         if (!server) {
             return new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
         }
         const roles = yield GetManagerData(server.roles);
         const roles_list = (_b = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name)) === null || _b === void 0 ? void 0 : _b.GetNode(consts_1.role_key);
-        for (let role of roles) {
-            if (role[1].managed || role[1].toString() === '@everyone') {
-                continue;
+        roles.forEach((role) => {
+            if (role.managed || role.toString() === '@everyone') {
+                return;
             }
-            roles_list === null || roles_list === void 0 ? void 0 : roles_list.PushTo(role[1].id);
-            roles_list === null || roles_list === void 0 ? void 0 : roles_list.PushTo(role[1].name);
-        }
+            roles_list === null || roles_list === void 0 ? void 0 : roles_list.PushTo(role.id);
+            roles_list === null || roles_list === void 0 ? void 0 : roles_list.PushTo(role.name);
+        });
         return roles_list ? roles_list : new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
     });
 }
@@ -122,10 +123,15 @@ function AskForRolesToNotOffer(node, message) {
     return true;
 }
 function GetServerRolesAndAskForRolesToNotOffer(message, queue) {
+    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         if (message.author.id !== consts_1.nomad_id) {
             return false;
         }
+        const args = message.content.split(' ');
+        const tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(queue.Front());
+        (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greet_chat_key)) === null || _a === void 0 ? void 0 : _a.Set(args[0]);
+        (_b = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.server_owner_key)) === null || _b === void 0 ? void 0 : _b.Set(args[1]);
         const roles_list = yield GetServerRoles(message, queue);
         const ret = AskForRolesToNotOffer(roles_list, message);
         disk_1.Disk.Get().Save();

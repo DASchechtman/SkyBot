@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "tsc": "tsc",
-    "deploy": "tsc && Copy.bat > nul && node .",
+    "deploy": "forever stopall && tsc && Copy.bat > nul && timeout /t 240 /nobreak && start_bot.bat",
     "deploy-d": "tsc && node ./js/index.js"
   },
   "author": "Dan S",

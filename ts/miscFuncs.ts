@@ -13,8 +13,8 @@ async function SendInitReactionMsg(guild: Guild) {
     const greet_id = tree?.GetNode(greet_chat_key)?.Get() as string | undefined
     if (typeof greet_id !== 'string') { return false }
 
-    const channel = channels.get(greet_id)
-    if (!channel?.isText()) { return false }
+    const channel = channels.find(c => c.id === greet_id)
+    if (!channel?.isText()) { console.log(`Error: channel doesn't exist in ${guild.name}`); return false }
 
     const roles = tree?.GetNode(role_key)
     let instructions = `<@${nomad_id}>, Please react to this message to associate the roles with emojis.\n`
@@ -68,14 +68,14 @@ async function GetServerRoles(message: Message, queue: Queue<string>): Promise<J
     if (queue.Size() === 0) { return new JsonTreeNode(NodeTypes.NULL_TYPE) }
 
     const group = await GetManagerData(message.author.client.guilds)
-    const guild_name = queue.Front()!!
+    const guild_name = queue.Front()!
 
     let server: Guild | undefined = undefined
     if (group.at(0) instanceof Guild) {
-        server = (group as Collection<string, Guild>).get(guild_name)
+        server = (group as Collection<string, Guild>).find(s => s.name === guild_name)
     }
     else {
-        server = await (group as Collection<string, OAuth2Guild>).get(guild_name)?.fetch()
+        server = await (group as Collection<string, OAuth2Guild>).find(s => s.name === guild_name)?.fetch()
     }
 
     if (!server) { return new JsonTreeNode(NodeTypes.NULL_TYPE) }
@@ -83,11 +83,11 @@ async function GetServerRoles(message: Message, queue: Queue<string>): Promise<J
     const roles = await GetManagerData(server.roles)
     const roles_list = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)?.GetNode(role_key)
 
-    for(let role of roles) {
-        if (role[1].managed || role[1].toString() === '@everyone') { continue }
-        roles_list?.PushTo(role[1].id)
-        roles_list?.PushTo(role[1].name)
-    }
+    roles.forEach((role) => {
+        if (role.managed || role.toString() === '@everyone') { return }
+        roles_list?.PushTo(role.id)
+        roles_list?.PushTo(role.name)
+    })
 
     return roles_list ? roles_list : new JsonTreeNode(NodeTypes.NULL_TYPE)
 }
@@ -112,6 +112,11 @@ function AskForRolesToNotOffer(node: JsonTreeNode, message: Message) {
 
 async function GetServerRolesAndAskForRolesToNotOffer(message: Message, queue: Queue<string>): Promise<boolean> {
     if (message.author.id !== nomad_id) { return false }
+    const args = message.content.split(' ')
+
+    const tree = Disk.Get().GetJsonTreeRoot().GetNode(queue.Front()!)
+    tree?.GetNode(greet_chat_key)?.Set(args[0])
+    tree?.GetNode(server_owner_key)?.Set(args[1])
 
     const roles_list = await GetServerRoles(message, queue)
     const ret = AskForRolesToNotOffer(roles_list, message)

@@ -291,12 +291,7 @@ export class JsonTreeNode {
                 break
             }
             case NodeTypes.STR_TYPE: {
-                if ((this.m_data as string).length === 0) {
-                    str_representation = '\"\"'
-                }
-                else {
-                    str_representation = `"${this.m_data}"`
-                }
+                str_representation = `"${this.m_data}"`
                 break
             }
             default: {

@@ -250,7 +250,7 @@ class JsonTreeNode {
                 str_representation = '{';
                 let i = 0;
                 this.m_data.forEach((val, key, map) => {
-                    str_representation += `${key}:${val}`;
+                    str_representation += `"${key}":${val}`;
                     if (i !== map.size - 1) {
                         str_representation += ',';
                     }
@@ -264,12 +264,7 @@ class JsonTreeNode {
                 break;
             }
             case NodeTypes.STR_TYPE: {
-                if (this.m_data.length === 0) {
-                    str_representation = '\"\"';
-                }
-                else {
-                    str_representation = `"${this.m_data}"`;
-                }
+                str_representation = `"${this.m_data}"`;
                 break;
             }
             default: {
