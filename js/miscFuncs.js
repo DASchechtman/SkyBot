@@ -20,7 +20,7 @@ function SendInitReactionMsg(guild) {
     return __awaiter(this, void 0, void 0, function* () {
         const channels = yield GetManagerData(guild.channels);
         const tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild.name);
-        const greet_id = (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greet_chat_key)) === null || _a === void 0 ? void 0 : _a.Get();
+        const greet_id = (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.GREET_CHAT_ID)) === null || _a === void 0 ? void 0 : _a.Get();
         if (typeof greet_id !== 'string') {
             return false;
         }
@@ -29,8 +29,8 @@ function SendInitReactionMsg(guild) {
             console.log(`Error: channel doesn't exist in ${guild.name}`);
             return false;
         }
-        const roles = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.role_key);
-        let instructions = `<@${consts_1.nomad_id}>, Please react to this message to associate the roles with emojis.\n`;
+        const roles = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.ROLE_KEY);
+        let instructions = `<@${consts_1.NOMAD_ID}>, Please react to this message to associate the roles with emojis.\n`;
         let index = 1;
         for (let i = 0; roles && i < roles.ArraySize(); i++) {
             const role_id = roles.GetAt(i);
@@ -42,11 +42,11 @@ function SendInitReactionMsg(guild) {
             index++;
         }
         const message = yield channel.send(instructions);
-        tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.react_setup_msg, message.id);
+        tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.EMOJI_SETUP_MSG_ID, message.id);
         disk_1.Disk.Get().Save();
-        GetManagerData(guild.members, consts_1.nomad_id).then((members) => {
+        GetManagerData(guild.members, consts_1.NOMAD_ID).then((members) => {
             var _a;
-            (_a = members.get(consts_1.nomad_id)) === null || _a === void 0 ? void 0 : _a.send("please check the server");
+            (_a = members.get(consts_1.NOMAD_ID)) === null || _a === void 0 ? void 0 : _a.send("please check the server");
         });
         return true;
     });
@@ -55,7 +55,7 @@ function RequestGreetChatAndUserId(guild, queue) {
     var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const members = yield GetManagerData(guild.members);
-        const nomad = members.get(consts_1.nomad_id);
+        const nomad = members.get(consts_1.NOMAD_ID);
         queue.Enqueue(guild.name);
         console.log('requesting info');
         if (!nomad) {
@@ -65,10 +65,10 @@ function RequestGreetChatAndUserId(guild, queue) {
         else {
             nomad.send("Please send the id of the greet channel, and owner of server here in that order");
             const tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild.name);
-            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.greet_chat_key, "");
-            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.server_owner_key, "");
-            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.role_key, new Array());
-            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.role_map, new Map());
+            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.GREET_CHAT_ID, "");
+            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.SERVER_OWNER_ID, "");
+            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.ROLE_KEY, new Array());
+            tree === null || tree === void 0 ? void 0 : tree.CreateChild(consts_1.ROLE_MAP, new Map());
             disk_1.Disk.Get().Save();
         }
         disk_1.Disk.Get().Save();
@@ -94,7 +94,7 @@ function GetServerRoles(message, queue) {
             return new jsonTree_1.JsonTreeNode(jsonTree_1.NodeTypes.NULL_TYPE);
         }
         const roles = yield GetManagerData(server.roles);
-        const roles_list = (_b = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name)) === null || _b === void 0 ? void 0 : _b.GetNode(consts_1.role_key);
+        const roles_list = (_b = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name)) === null || _b === void 0 ? void 0 : _b.GetNode(consts_1.ROLE_KEY);
         roles.forEach((role) => {
             if (role.managed || role.toString() === '@everyone') {
                 return;
@@ -125,13 +125,13 @@ function AskForRolesToNotOffer(node, message) {
 function GetServerRolesAndAskForRolesToNotOffer(message, queue) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
-        if (message.author.id !== consts_1.nomad_id) {
+        if (message.author.id !== consts_1.NOMAD_ID) {
             return false;
         }
         const args = message.content.split(' ');
         const tree = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(queue.Front());
-        (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.greet_chat_key)) === null || _a === void 0 ? void 0 : _a.Set(args[0]);
-        (_b = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.server_owner_key)) === null || _b === void 0 ? void 0 : _b.Set(args[1]);
+        (_a = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.GREET_CHAT_ID)) === null || _a === void 0 ? void 0 : _a.Set(args[0]);
+        (_b = tree === null || tree === void 0 ? void 0 : tree.GetNode(consts_1.SERVER_OWNER_ID)) === null || _b === void 0 ? void 0 : _b.Set(args[1]);
         const roles_list = yield GetServerRoles(message, queue);
         const ret = AskForRolesToNotOffer(roles_list, message);
         disk_1.Disk.Get().Save();
@@ -140,7 +140,7 @@ function GetServerRolesAndAskForRolesToNotOffer(message, queue) {
 }
 function ExcludeRoles(message, guild_name) {
     const json_guild_root = disk_1.Disk.Get().GetJsonTreeRoot().GetNode(guild_name);
-    const roles_list = json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.role_key);
+    const roles_list = json_guild_root === null || json_guild_root === void 0 ? void 0 : json_guild_root.GetNode(consts_1.ROLE_KEY);
     const role_indexes = message.content.split(' ');
     for (let str_index of role_indexes) {
         const num = Number.parseInt(str_index);

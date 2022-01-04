@@ -1,5 +1,5 @@
 import { Collection, Guild, GuildInviteManager, Message, OAuth2Guild, Role } from "discord.js";
-import { greet_chat_key, nomad_id, react_setup_msg, role_key, role_map, server_owner_key } from "./consts";
+import { GREET_CHAT_ID, NOMAD_ID, EMOJI_SETUP_MSG_ID, ROLE_KEY, ROLE_MAP, SERVER_OWNER_ID } from "./consts";
 import { Disk } from "./disk";
 import { Queue } from "./queue";
 import { Manager } from './interfaces'
@@ -10,14 +10,14 @@ async function SendInitReactionMsg(guild: Guild) {
     const channels = await GetManagerData(guild.channels)
     const tree = Disk.Get().GetJsonTreeRoot().GetNode(guild.name)
 
-    const greet_id = tree?.GetNode(greet_chat_key)?.Get() as string | undefined
+    const greet_id = tree?.GetNode(GREET_CHAT_ID)?.Get() as string | undefined
     if (typeof greet_id !== 'string') { return false }
 
     const channel = channels.find(c => c.id === greet_id)
     if (!channel?.isText()) { console.log(`Error: channel doesn't exist in ${guild.name}`); return false }
 
-    const roles = tree?.GetNode(role_key)
-    let instructions = `<@${nomad_id}>, Please react to this message to associate the roles with emojis.\n`
+    const roles = tree?.GetNode(ROLE_KEY)
+    let instructions = `<@${NOMAD_ID}>, Please react to this message to associate the roles with emojis.\n`
     let index = 1
 
     for (let i = 0; roles && i < roles.ArraySize(); i++) {
@@ -30,11 +30,11 @@ async function SendInitReactionMsg(guild: Guild) {
 
     const message = await channel.send(instructions)
 
-    tree?.CreateChild(react_setup_msg, message.id)
+    tree?.CreateChild(EMOJI_SETUP_MSG_ID, message.id)
     Disk.Get().Save()
 
-    GetManagerData(guild.members, nomad_id).then((members) => {
-        members.get(nomad_id)?.send("please check the server")
+    GetManagerData(guild.members, NOMAD_ID).then((members) => {
+        members.get(NOMAD_ID)?.send("please check the server")
     })
 
     return true
@@ -42,7 +42,7 @@ async function SendInitReactionMsg(guild: Guild) {
 
 async function RequestGreetChatAndUserId(guild: Guild, queue: Queue<string>): Promise<boolean> {
     const members = await GetManagerData(guild.members)
-    const nomad = members.get(nomad_id)
+    const nomad = members.get(NOMAD_ID)
     queue.Enqueue(guild.name)
     console.log('requesting info')
 
@@ -53,10 +53,10 @@ async function RequestGreetChatAndUserId(guild: Guild, queue: Queue<string>): Pr
     else {
         nomad.send("Please send the id of the greet channel, and owner of server here in that order")
         const tree = Disk.Get().GetJsonTreeRoot().GetNode(guild.name)
-        tree?.CreateChild(greet_chat_key, "")
-        tree?.CreateChild(server_owner_key, "")
-        tree?.CreateChild(role_key, new Array())
-        tree?.CreateChild(role_map, new Map())
+        tree?.CreateChild(GREET_CHAT_ID, "")
+        tree?.CreateChild(SERVER_OWNER_ID, "")
+        tree?.CreateChild(ROLE_KEY, new Array())
+        tree?.CreateChild(ROLE_MAP, new Map())
         Disk.Get().Save()
     }
 
@@ -81,7 +81,7 @@ async function GetServerRoles(message: Message, queue: Queue<string>): Promise<J
     if (!server) { return new JsonTreeNode(NodeTypes.NULL_TYPE) }
 
     const roles = await GetManagerData(server.roles)
-    const roles_list = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)?.GetNode(role_key)
+    const roles_list = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)?.GetNode(ROLE_KEY)
 
     roles.forEach((role) => {
         if (role.managed || role.toString() === '@everyone') { return }
@@ -111,12 +111,12 @@ function AskForRolesToNotOffer(node: JsonTreeNode, message: Message) {
 }
 
 async function GetServerRolesAndAskForRolesToNotOffer(message: Message, queue: Queue<string>): Promise<boolean> {
-    if (message.author.id !== nomad_id) { return false }
+    if (message.author.id !== NOMAD_ID) { return false }
     const args = message.content.split(' ')
 
     const tree = Disk.Get().GetJsonTreeRoot().GetNode(queue.Front()!)
-    tree?.GetNode(greet_chat_key)?.Set(args[0])
-    tree?.GetNode(server_owner_key)?.Set(args[1])
+    tree?.GetNode(GREET_CHAT_ID)?.Set(args[0])
+    tree?.GetNode(SERVER_OWNER_ID)?.Set(args[1])
 
     const roles_list = await GetServerRoles(message, queue)
     const ret = AskForRolesToNotOffer(roles_list, message)
@@ -126,7 +126,7 @@ async function GetServerRolesAndAskForRolesToNotOffer(message: Message, queue: Q
 
 function ExcludeRoles(message: Message, guild_name: string) {
     const json_guild_root = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)
-    const roles_list = json_guild_root?.GetNode(role_key)
+    const roles_list = json_guild_root?.GetNode(ROLE_KEY)
     const role_indexes = message.content.split(' ')
 
     for (let str_index of role_indexes) {
