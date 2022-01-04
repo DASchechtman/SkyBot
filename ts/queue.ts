@@ -1,8 +1,12 @@
 export class Queue<T> {
     private m_queue: Array<T>
+    private m_front: number
+    private m_back: () => number
 
     public constructor() {
         this.m_queue = []
+        this.m_front = 0
+        this.m_back = () => this.m_queue.length - 1
     }
 
     public Enqueue(data: T) {
@@ -17,12 +21,12 @@ export class Queue<T> {
 
     public Front() {
         if (this.m_queue.length === 0) { return undefined }
-        return this.m_queue[0]
+        return this.m_queue[this.m_front]
     }
 
     public Back() {
         if (this.m_queue.length === 0) { return undefined }
-        return this.m_queue[this.m_queue.length-1]
+        return this.m_queue[this.m_back()]
     }
 
     public Size() {
@@ -30,8 +34,6 @@ export class Queue<T> {
     }
 
     public Clear() {
-        while (this.Size() > 0) {
-            this.Dequeue()
-        }
+        this.m_queue.splice(0)
     }
 }

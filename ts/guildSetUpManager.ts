@@ -6,7 +6,7 @@ import { Queue } from "./queue";
 export class SetUpManager {
     private static manager: SetUpManager | null = null
     private m_guilds: Map<string, Queue<InputPipe>>
-    private m_other_membs: Map<string, Queue<InputPipe>>
+    private m_other_guild_membs: Map<string, Queue<InputPipe>>
 
     public static Get() {
         if(this.manager === null) {
@@ -17,7 +17,7 @@ export class SetUpManager {
 
     private constructor() {
         this.m_guilds = new Map()
-        this.m_other_membs = new Map()
+        this.m_other_guild_membs = new Map()
     }
 
     public Add(key: GuildMember) {
@@ -29,14 +29,14 @@ export class SetUpManager {
         const pipe = CreatePipe()
         queue.Enqueue(pipe)
 
-        if (!this.m_other_membs.has(key.guild.id)) {
-            this.m_other_membs.set(key.guild.id, queue)
+        if (!this.m_other_guild_membs.has(key.guild.id)) {
+            this.m_other_guild_membs.set(key.guild.id, queue)
         }
     }
 
     public Delete(key: GuildMember) {
         this.m_guilds.delete(key.id)
-        this.m_other_membs.delete(key.guild.id)
+        this.m_other_guild_membs.delete(key.guild.id)
     }
 
     public GetIncompletePipe(key: string) {
@@ -63,7 +63,7 @@ export class SetUpManager {
     }
 
     public ServerNotReady(server_id: string) {
-        return this.m_other_membs.has(server_id) && !this.m_other_membs.get(server_id)?.Front()?.IsComplete()
+        return this.m_other_guild_membs.has(server_id) && !this.m_other_guild_membs.get(server_id)?.Front()?.IsComplete()
     }
 
 }

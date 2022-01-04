@@ -3,47 +3,8 @@ import { greet_chat_key, nomad_id, react_setup_msg, role_key, role_map, server_o
 import { Disk } from "./disk";
 import { Queue } from "./queue";
 import { Manager } from './interfaces'
-import { NodeTypes } from "./jsonTree";
+import { JsonTreeNode, NodeTypes } from "./jsonTree";
 import { InputPipe } from "./inputPipe";
-
-function CreateListMessage<T>(
-    func: (item: T) => string, 
-    omit_res: (item: T) => boolean, 
-    id_func: (item: T) => string,
-    array: Collection<string, T>, 
-    init_msg: string): [string, {i: number, id: string}[]] {
-    let ret_message = init_msg
-    let indexes: {i: number, id: string}[] = []
-    let index = 1
-
-    for (let i of array) {
-        if (omit_res(i[1])) { continue }
-        ret_message += `${index}.) ${func(i[1])}\n`
-        indexes.push({
-            i: index-1,
-            id: id_func(i[1])
-        })
-        index++
-    }
-
-    return [ret_message, indexes]
-}
-
-async function AskRolesToRemove(guild: Guild) {
-    const roles = await GetManagerData(guild.roles)
-
-    let res = CreateListMessage(
-        (item) => { return item.name },
-        (item) => { return item.managed || `${item}` === "@everyone" },
-        (item) => { return item.id },
-        roles,
-        "Please pick the roles you wish to exclude.\n"
-    )
-
-    await (await GetManagerData(guild.members, nomad_id)).get(nomad_id)?.send(res[0])
-
-    return res[1]
-}
 
 async function SendInitReactionMsg(guild: Guild) {
     const channels = await GetManagerData(guild.channels)
@@ -103,86 +64,104 @@ async function RequestGreetChatAndUserId(guild: Guild, queue: Queue<string>): Pr
     return true
 }
 
-async function GetServerRolesAndAskForExcluded(message: Message, queue: Queue<string>): Promise<boolean> {
-    if (message.author.id !== nomad_id) { return false }
+async function GetServerRoles(message: Message, queue: Queue<string>): Promise<JsonTreeNode> {
+    if (queue.Size() === 0) { return new JsonTreeNode(NodeTypes.NULL_TYPE) }
 
-    const args = message.content.split(' ')
+    const group = await GetManagerData(message.author.client.guilds)
     const guild_name = queue.Front()!!
 
-    let guild = await GetManagerData(message.author.client.guilds)
-    const was_cached = guild.at(0) instanceof Guild
-
-    const json_node = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)
-    json_node?.GetNode(greet_chat_key)?.Set(args[0])
-    json_node?.GetNode(server_owner_key)?.Set(args[1])
-    Disk.Get().Save()
-
-    const RecordRoles = async (guild: Guild) => {
-        for (let entry of await AskRolesToRemove(guild)) {
-            json_node?.GetNode(role_key)?.SetAt(entry.i, entry.id)
-        }
+    let server: Guild | undefined = undefined
+    if (group.at(0) instanceof Guild) {
+        server = (group as Collection<string, Guild>).get(guild_name)
+    }
+    else {
+        server = await (group as Collection<string, OAuth2Guild>).get(guild_name)?.fetch()
     }
 
-    if (was_cached) {
-        guild = guild as Collection<string, Guild>
-        const server = guild.find(s => s.name === guild_name)
-        if (server) {
-            RecordRoles(server)
-        }
-        return Boolean(server)
+    if (!server) { return new JsonTreeNode(NodeTypes.NULL_TYPE) }
+
+    const roles = await GetManagerData(server.roles)
+    const roles_list = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)?.GetNode(role_key)
+
+    for(let role of roles) {
+        if (role[1].managed || role[1].toString() === '@everyone') { continue }
+        roles_list?.PushTo(role[1].id)
+        roles_list?.PushTo(role[1].name)
     }
 
-    guild = guild as Collection<string, OAuth2Guild>
-    const server = await guild.find(s => s.name === guild_name)?.fetch()
-    if (server) {
-        RecordRoles(server)
-    }
-
-    return Boolean(server)
+    return roles_list ? roles_list : new JsonTreeNode(NodeTypes.NULL_TYPE)
 }
 
-async function ExcludeRolesAndAskForReactsOnMsg(message: Message, queue: Queue<string>): Promise<boolean> {
-    const guild_name = queue.Front()!!
-    const tree = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)
-    let rk = role_key
-    let roles = tree?.GetNode(rk)
-    if (!roles) { return false }
+function AskForRolesToNotOffer(node: JsonTreeNode, message: Message) {
+    if (node.Type() !== NodeTypes.ARRAY_TYPE) { return false }
 
-    console.log("sending react msg")
+    let instructions = "Please pick the roles you wish to exclude.\n"
+    let index = 1
 
-    const indexes = message.content.split(' ')
-
-    for (let str of indexes) {
-        let num = Number.parseInt(str)
-        if (Number.isNaN(num)) { continue }
-        tree?.GetNode(role_key)?.SetAt(num - 1, null)
+    for(let i = 0; i < node.ArraySize(); i += 2) {
+        const name_index = i + 1
+        instructions += `${index}.) ${node.GetAt(name_index)?.Get()}\n`
+        node.SetAt(name_index, null)
+        index++
     }
 
-    tree?.GetNode(role_key)?.Filter(item => item.Type() !== NodeTypes.NULL_TYPE)
-    Disk.Get().Save()
+    node.Filter(item => item.Type() !== NodeTypes.NULL_TYPE)
+    message.channel.send(instructions)
+    return true
+}
 
+async function GetServerRolesAndAskForRolesToNotOffer(message: Message, queue: Queue<string>): Promise<boolean> {
+    if (message.author.id !== nomad_id) { return false }
+
+    const roles_list = await GetServerRoles(message, queue)
+    const ret = AskForRolesToNotOffer(roles_list, message)
+    Disk.Get().Save()
+    return ret
+}
+
+function ExcludeRoles(message: Message, guild_name: string) {
+    const json_guild_root = Disk.Get().GetJsonTreeRoot().GetNode(guild_name)
+    const roles_list = json_guild_root?.GetNode(role_key)
+    const role_indexes = message.content.split(' ')
+
+    for (let str_index of role_indexes) {
+        const num = Number.parseInt(str_index)
+        if (Number.isNaN(num)) { continue }
+        roles_list?.SetAt(num-1, null)
+    }
+
+    roles_list?.Filter(item => item.Type() != NodeTypes.NULL_TYPE)
+}
+
+async function AskForReactionOnMsg(message: Message, guild_name: string) {
     const members = await GetManagerData(message.author.client.guilds, g => g.name === guild_name)
 
     if (members.at(0) instanceof Guild) {
         const server = (members as Collection<string, Guild>).find(s => s.name === guild_name)
         if (server) {
             SendInitReactionMsg(server)
-            return Boolean(server)
         }
+        return Boolean(server)
     }
 
     const server = await (members as Collection<string, OAuth2Guild>).find(s => s.name === guild_name)?.fetch()
     if (server) {
         SendInitReactionMsg(server)
     }
+}
 
-    return Boolean(server)
+async function ExcludeRolesAndAskForReactsOnMsg(message: Message, queue: Queue<string>): Promise<boolean> {
+    const guild_name = queue.Front()!!
+    ExcludeRoles(message, guild_name)
+    AskForReactionOnMsg(message, guild_name)
+    Disk.Get().Save()
+    return true
 }
 
 export function CreatePipe(): InputPipe {
     const pipe = new InputPipe()
     pipe.MakeStartOfPipe(RequestGreetChatAndUserId)
-    pipe.AddToPipe(GetServerRolesAndAskForExcluded)
+    pipe.AddToPipe(GetServerRolesAndAskForRolesToNotOffer)
     pipe.AddToPipe(ExcludeRolesAndAskForReactsOnMsg)
     return pipe
 }

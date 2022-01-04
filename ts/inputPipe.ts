@@ -48,27 +48,28 @@ export class InputPipe {
             return
         }
 
-        if (this.m_cur_func >= this.m_pipe.length) {
+        const incorrect_setup = this.m_cur_func >= this.m_pipe.length
+        const bad_arg_for_first_func = this.m_cur_func === 0 && input instanceof Message
+        const bad_arg_for_rest_funcs = this.m_cur_func > 0 && input instanceof Guild
+        
+        if (incorrect_setup) {
             throw new Error("Input Pipe was not set up correctly")
         }
-        else if (this.m_cur_func === 0 && input instanceof Message) {
+        else if (bad_arg_for_first_func || bad_arg_for_rest_funcs) {
             return
         }
-        else if (this.m_cur_func > 0 && input instanceof Guild) {
-            return
-        }
+        
 
-        console.log(this.m_cur_func)
-        let res: boolean
+        let get_next_func: boolean
         let func = this.m_pipe[this.m_cur_func]
         if (this.m_cur_func === 0) {
-            res = await (func as InputPipeFunc<Guild>)(input as Guild, this.m_data_store);
+            get_next_func = await (func as InputPipeFunc<Guild>)(input as Guild, this.m_data_store);
         }
         else {
-            res = await (func as InputPipeFunc<Message>)(input as Message, this.m_data_store);
+            get_next_func = await (func as InputPipeFunc<Message>)(input as Message, this.m_data_store);
         }
 
-        if (res) {
+        if (get_next_func) {
             this.m_cur_func++
         }
     }

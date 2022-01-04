@@ -59,6 +59,10 @@ export class JsonTreeNode {
         return type
     }
 
+    private IndexInBounds(index: number): boolean {
+        return this.m_type === NodeTypes.ARRAY_TYPE && index >= 0 && index < (this.m_data as JsonArray).length
+    }
+
     public Type(): NodeTypes {
         return this.m_type
     }
@@ -92,30 +96,31 @@ export class JsonTreeNode {
         return false
     }
 
-    public SetAt(index: number, data: JsonType) {
+    public SetAt(index: number, data: JsonType): boolean {
         let type = this.GetDataType(data)
         if (type === undefined) {
-            type = NodeTypes.NULL_TYPE
-            data = null
+            return false
         }
 
         const node = new JsonTreeNode(type)
         node.Set(data)
 
-        if (this.m_type === NodeTypes.ARRAY_TYPE) {
+        if (this.IndexInBounds(index)) {
             (this.m_data as JsonArray)[index] = node
+            return true
         }
+        return false
     }
 
-    public GetAt(index: number) {
+    public GetAt(index: number): JsonTreeNode | undefined {
         let ret = undefined
-        if (this.m_type === NodeTypes.ARRAY_TYPE) {
+        if (this.IndexInBounds(index)) {
             ret = (this.m_data as JsonArray)[index]
         }
         return ret
     }
 
-    public ArraySize() {
+    public ArraySize(): number {
         let size = -1
         if (this.m_type === NodeTypes.ARRAY_TYPE) {
             size = (this.m_data as JsonArray).length
@@ -143,33 +148,38 @@ export class JsonTreeNode {
         return vals
     }
 
-    public RemoveAt(index: number) {
-        if (this.m_type === NodeTypes.ARRAY_TYPE) {
+    public RemoveAt(index: number): boolean {
+        if (this.IndexInBounds(index)) {
             (this.m_data as JsonArray).splice(index, 1)
+            return true
         }
+        return false
     }
 
-    public PushTo(data: JsonType) {
+    public PushTo(data: JsonType): boolean {
         let type = this.GetDataType(data)
         if (type === undefined) {
-            type = NodeTypes.NULL_TYPE
-            data = null
+            return false
         }
 
         if (this.m_type === NodeTypes.ARRAY_TYPE) {
             const node = new JsonTreeNode(type);
             node.Set(data);
             (this.m_data as JsonArray).push(node)
+            return true
         }
+        return false
     }
 
-    public Filter(func: (item: JsonTreeNode) => boolean) {
+    public Filter(func: (item: JsonTreeNode) => boolean): boolean {
         if (this.m_type === NodeTypes.ARRAY_TYPE) {
             this.m_data = (this.m_data as JsonArray).filter((item) => {return func(item)})
+            return true
         }
+        return false
     }
 
-    public Find(func: (item: JsonTreeNode) => boolean) {
+    public Find(func: (item: JsonTreeNode) => boolean): JsonTreeNode | undefined {
         let ret = undefined
         if (this.m_type === NodeTypes.ARRAY_TYPE) {
             ret = (this.m_data as JsonArray).find(func)
@@ -250,49 +260,30 @@ export class JsonTreeNode {
 
     public toString() {
         let str_representation = ""
-        const container_chars: string[] = []
-        let brackets = ""
-
+        
         switch(this.m_type) {
             case NodeTypes.ARRAY_TYPE: {
-                brackets = "[]"
-                container_chars.push(brackets[0]);
-                for(let i = 0; i < (this.m_data as Array<JsonTreeNode>).length; i++) {
-                    let node = (this.m_data as Array<JsonType>)[0]
-                    if (node === null) {
-                        node = "null"
+                str_representation = '[';
+                (this.m_data as JsonArray).forEach((val, i, arr) => {
+                    str_representation += val.toString()
+                    if (i !== arr.length-1) {
+                        str_representation += ','
                     }
-
-                    container_chars.push(node.toString(), ',')
-                }
-                
-                if (container_chars.length > 1) {
-                    const last_index = container_chars.length-1
-                    container_chars[last_index] = brackets[1]
-                }
-                else {
-                   container_chars.push(brackets[1])
-                }
-
-                str_representation = container_chars.join()
+                })
+                str_representation += ']'
                 break
             }
             case NodeTypes.ROOT_TYPE: {
-                brackets = "{}"
-                container_chars.push(brackets[0]);
-                (this.m_data as Map<string, JsonTreeNode>).forEach((node, key) => {
-                    container_chars.push(key, ':', node.toString(), ',')
+                str_representation = '{'
+                let i = 0;
+                (this.m_data as JsonMap).forEach((val, key, map) => {
+                    str_representation += `${key}:${val}`
+                    if (i !== map.size - 1) {
+                        str_representation += ','
+                    }
+                    i++
                 })
-
-                if (container_chars.length > 1) {
-                    const last_index = container_chars.length-1
-                    container_chars[last_index] = brackets[1]
-                }
-                else {
-                   container_chars.push(brackets[1])
-                }
-
-                str_representation = container_chars.join()
+                str_representation += '}'
                 break
             }
             case NodeTypes.NULL_TYPE: {
@@ -301,11 +292,12 @@ export class JsonTreeNode {
             }
             case NodeTypes.STR_TYPE: {
                 if ((this.m_data as string).length === 0) {
-                    return '\"\"'
+                    str_representation = '\"\"'
                 }
                 else {
-                    return `"${this.m_data}"`
+                    str_representation = `"${this.m_data}"`
                 }
+                break
             }
             default: {
                 str_representation = this.m_data.toString()

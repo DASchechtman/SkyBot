@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { JsonTreeNode, NodeTypes } from './jsonTree'
+import { JsonArray, JsonTreeNode, NodeTypes } from './jsonTree'
 
 export class Disk {
     private static m_disk: Disk | null = null
@@ -18,61 +18,55 @@ export class Disk {
         this.m_tree_root = new JsonTreeNode(NodeTypes.ROOT_TYPE)
         this.m_file_path = path.resolve(__dirname, '../guild_records.json')
         const tree = JSON.parse(fs.readFileSync(this.m_file_path, 'utf-8'))
-        this.ReadTree(tree, this.m_tree_root)
+        this.CreateTree(tree, this.m_tree_root)
         console.log("done building tree")
     }
 
     private CreateArray(val: Array<any>): Array<JsonTreeNode> {
-        const ret_array = new Array<JsonTreeNode>()
+        const ret_array: JsonArray = new Array()
 
         val.forEach((item) => {
             let node: JsonTreeNode
-            if (item instanceof Array) {
-                node = new JsonTreeNode(NodeTypes.ARRAY_TYPE)
-                node.Set(this.CreateArray(item))
-                ret_array.push(node)
-            }
-            else if (typeof item === 'number') {
-                node = new JsonTreeNode(NodeTypes.NUM_TYPE)
-                node.Set(val)
-                ret_array.push(node)
-            }
-            else if (typeof item === 'string') {
-                node = new JsonTreeNode(NodeTypes.STR_TYPE)
-                node.Set(val)
-                ret_array.push(node)
-            }
-            else if (typeof item === 'boolean') {
-                node = new JsonTreeNode(NodeTypes.BOOL_TYPE)
-                node.Set(val)
-                ret_array.push(node)
-            }
-            else if (item === null) {
-                node = new JsonTreeNode(NodeTypes.NULL_TYPE)
-                node.Set(null)
-                ret_array.push(node)
-            }
-            else {
-                node = new JsonTreeNode(NodeTypes.ROOT_TYPE)
-                this.ReadTree(item, node)
-                ret_array.push(node)
+            let type: NodeTypes = NodeTypes.NULL_TYPE
+
+            if (typeof item === 'number') { type = NodeTypes.NUM_TYPE }
+            else if (typeof item === 'string') { type = NodeTypes.STR_TYPE }
+            else if (typeof item === 'boolean') { type = NodeTypes.BOOL_TYPE }
+            else if (item === null) { type = NodeTypes.NULL_TYPE }
+            else if (item instanceof Array) { type = NodeTypes.ARRAY_TYPE }
+            else { type = NodeTypes.ROOT_TYPE }
+
+            switch (type) {
+                case NodeTypes.ARRAY_TYPE: {
+                    node = new JsonTreeNode(NodeTypes.ARRAY_TYPE)
+                    node.Set(this.CreateArray(item))
+                    ret_array.push(node)
+                    break
+                }
+                case NodeTypes.ROOT_TYPE: {
+                    node = new JsonTreeNode(NodeTypes.ROOT_TYPE)
+                    this.CreateTree(item, node)
+                    ret_array.push(node)
+                    break
+                }
+                default: {
+                    node = new JsonTreeNode(type)
+                    node.Set(item)
+                    ret_array.push(node)
+                }
             }
         })
 
         return ret_array
     }
 
-    private ReadTree(tree: any, json_tree: JsonTreeNode) {
-        for(let obj of Object.entries(tree)) {
+    private CreateTree(tree_root: any, json_tree_root: JsonTreeNode) {
+        for (let obj of Object.entries(tree_root)) {
             const key: string = obj[0]
             const val: unknown = obj[1]
             let node: JsonTreeNode
-
-            if (val instanceof Array) {
-                node = new JsonTreeNode(NodeTypes.ARRAY_TYPE)
-                node.Set(this.CreateArray(val))
-            }
-            else if (typeof val === 'number') {
+            
+            if (typeof val === 'number') {
                 node = new JsonTreeNode(NodeTypes.NUM_TYPE)
                 node.Set(val)
             }
@@ -88,13 +82,17 @@ export class Disk {
                 node = new JsonTreeNode(NodeTypes.NULL_TYPE)
                 node.Set(null)
             }
+            else if (val instanceof Array) {
+                node = new JsonTreeNode(NodeTypes.ARRAY_TYPE)
+                node.Set(this.CreateArray(val))
+            }
             else {
                 node = new JsonTreeNode(NodeTypes.ROOT_TYPE)
-                this.ReadTree(val, node)
+                this.CreateTree(val, node)
             }
 
-            json_tree.AddChild(key, node)
-        }   
+            json_tree_root.AddChild(key, node)
+        }
     }
 
     public Save(): void {
